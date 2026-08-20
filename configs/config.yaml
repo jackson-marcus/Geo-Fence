@@ -1,0 +1,20 @@
+# Pipeline configuration. Paths relative to the repo root.
+
+data:
+  processed_dir: data/processed
+  grid_size: 40             # 40x40 city grid, each cell ~1km
+  n_stores: 9
+  seed: 42
+
+gravity:
+  # Huff model: attraction = size^alpha / distance^beta
+  alpha: 1.0
+  beta: 2.0
+  max_distance_km: 12
+
+placement:
+  candidate_step: 2         # evaluate every 2nd cell as a candidate site
+  new_store_size: 1200
+
+eval:
+  experiment_name: geofence
