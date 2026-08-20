@@ -58,7 +58,9 @@ def trade_area(population: np.ndarray, stores: pd.DataFrame, store_id: int, thre
     return share >= threshold
 
 
-def score_site(population: np.ndarray, stores: pd.DataFrame, x: float, y: float, size: float) -> dict:
+def score_site(
+    population: np.ndarray, stores: pd.DataFrame, x: float, y: float, size: float
+) -> dict:
     """Add a hypothetical store; report net-new vs cannibalized demand."""
     before = patronage(population, stores).sum(axis=(1, 2))
     candidate = pd.concat(
@@ -79,12 +81,34 @@ def score_site(population: np.ndarray, stores: pd.DataFrame, x: float, y: float,
     }
 
 
-def best_sites(population: np.ndarray, stores: pd.DataFrame, top_k: int = 10) -> list[dict]:
+def sweep_sites(population: np.ndarray, stores: pd.DataFrame) -> list[dict]:
+    """Score every candidate cell on the placement grid."""
     cfg = get_config()["placement"]
     grid = population.shape[0]
     results = []
     for y in range(2, grid - 2, cfg["candidate_step"]):
         for x in range(2, grid - 2, cfg["candidate_step"]):
-            results.append(score_site(population, stores, float(x), float(y), cfg["new_store_size"]))
+            results.append(
+                score_site(population, stores, float(x), float(y), cfg["new_store_size"])
+            )
+    return results
+
+
+def best_sites(population: np.ndarray, stores: pd.DataFrame, top_k: int = 10) -> list[dict]:
+    results = sweep_sites(population, stores)
     results.sort(key=lambda r: -r["net_new_demand"])
     return results[:top_k]
+
+
+def isochrone(
+    population: np.ndarray,
+    stores: pd.DataFrame,
+    store_id: int,
+    minutes: float = 15.0,
+    speed_kmh: float = 30.0,
+) -> np.ndarray:
+    """Drive-time reach: cells within `minutes` of the store at average city speed."""
+    grid = population.shape[0]
+    row = stores.loc[stores["store_id"] == store_id].iloc[0]
+    d = _distances(grid, row["x"], row["y"])
+    return d <= speed_kmh * minutes / 60.0
