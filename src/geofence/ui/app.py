@@ -57,7 +57,9 @@ with col2:
     y = st.slider("y", 0.0, float(population.shape[0] - 1), 20.0)
     size = st.select_slider("Store size (sqm)", [600, 900, 1200, 1800], value=1200)
     if st.button("Score site", type="primary"):
-        rs = httpx.post(f"{API_URL}/score-site", json={"x": x, "y": y, "size_sqm": size}, timeout=60)
+        rs = httpx.post(
+            f"{API_URL}/score-site", json={"x": x, "y": y, "size_sqm": size}, timeout=60
+        )
         if rs.status_code == 200:
             s = rs.json()
             st.metric("Captured demand", f"{s['captured_demand']:,.0f}")
