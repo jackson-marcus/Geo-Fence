@@ -10,7 +10,7 @@ import pandas as pd
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, Field
 
-from geofence.models.huff import best_sites, score_site, store_summary
+from geofence.models.huff import best_sites, isochrone, score_site, store_summary, trade_area
 from geofence.settings import get_config, resolve_path
 
 logger = logging.getLogger(__name__)
@@ -77,3 +77,23 @@ def best(top_k: int = 8) -> list[dict]:
     except FileNotFoundError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     return best_sites(population, store_df, top_k=top_k)
+
+
+@router.get("/trade-area/{store_id}")
+def trade(store_id: int, minutes: float = 15.0, threshold: float = 0.5) -> dict:
+    try:
+        population, store_df = _city()
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=503, detail=str(exc)) from exc
+    if store_id not in set(store_df["store_id"]):
+        raise HTTPException(status_code=404, detail=f"unknown store_id {store_id}")
+    iso = isochrone(population, store_df, store_id, minutes=minutes)
+    capture = trade_area(population, store_df, store_id, threshold=threshold)
+    return {
+        "store_id": store_id,
+        "minutes": minutes,
+        "isochrone_cells": int(iso.sum()),
+        "isochrone_population": round(float(population[iso].sum()), 1),
+        "capture_cells": int(capture.sum()),
+        "capture_population": round(float(population[capture].sum()), 1),
+    }
