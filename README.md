@@ -17,8 +17,6 @@
 
 </div>
 
-> **Portfolio project.** Built to demonstrate spatial modelling and a clean data/API/UI split on synthetic data. Not hardened for production use.
-
 ---
 
 ## The problem
