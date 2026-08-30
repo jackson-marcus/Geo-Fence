@@ -1,73 +1,187 @@
-# GeoFence — Spatial Retail Gravity & Catchment Area Optimization <div align="center"> [![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
-[![Streamlit](https://img.shields.io/badge/Streamlit-App-FF4B4B.svg?logo=streamlit&logoColor=white)](https://streamlit.io/)
-[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)](https://www.docker.com/)
-[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
-[![Tests: Pytest](https://img.shields.io/badge/tests-pytest-blue.svg?logo=pytest&logoColor=white)](https://pytest.org/) </div> > **Geospatial retail site selection, Huff gravity model simulation, and store cannibalization analysis engineered with a zero-OOP Data-Oriented Vectorised Kernel Architecture — maximizing CPU SIMD throughput and cache locality via contiguous Structure-of-Arrays (SoA) tensor broadcasts.** --- ## 🏛️ Architecture Pattern **Data-Oriented Vectorised Kernels Architecture (Zero-OOP, Array-First)** Geospatial catchment area modeling evaluates thousands of continuous spatial grid cells across competing retail networks:
-> **Note:** This is a portfolio project demonstrating software engineering patterns and ML concepts. Not intended for production use without further hardening. - **Object-Oriented Pitfalls:** Wrapping each grid cell or store coordinate in rich Python objects causes massive pointer indirection, cache thrashing, and high overhead ($O(N \times S)$ object allocations).
-- **Contiguous SIMD Computation:** Matrix math and Euclidean distance calculations run orders of magnitude faster when laid out in contiguous C-order memory buffers. The **Data-Oriented Vectorised Kernel Architecture** completely replaces object-oriented domain hierarchies with pure, side-effect-free NumPy vectorized kernels operating over **Structure-of-Arrays (`SpatialStoreGrid`)** and 3D broadcast tensors: ```mermaid
-flowchart TD subgraph MemoryLayout["💾 Contiguous SoA Memory Layout"] Pop["Population Matrix: (H, W) float64"] Stores["SpatialStoreGrid: x[S], y[S], size[S]"] end subgraph VectorKernels["⚡ Pure Vectorized Spatial Kernels"] K1["distance_tensor_kernel()<br/>(S, H, W) Broadcast Euclidean Distance"] K2["huff_attraction_kernel()<br/>(S, H, W) Gravity Decay Tensor"] K3["patronage_share_kernel()<br/>(S, H, W) Cell-Level Probability Shares"] K4["evaluate_site_placement_kernel()<br/>(Candidate Capture & Cannibalization Delta)"] end Pop & Stores --> K1 --> K2 --> K3 --> K4 K4 --> Result["OptimalSiteResult<br/>(Net-New Demand vs Cannibalization %)"]
-``` ### Vectorized Kernels Matrix | Kernel Function | Tensor Dimension | Operation | SIMD Optimization |
-|---|---|---|---|
-| `distance_tensor_kernel` | $(S, H, W)$ | $D_{s, y, x} = \sqrt{(x - x_s)^2 + (y - y_s)^2} + d_0$ | 3D NumPy broadcasting |
-| `huff_attraction_kernel` | $(S, H, W)$ | $A_{s, y, x} = \frac{\text{Size}_s^\alpha}{D_{s, y, x}^\beta} \cdot \mathbb{I}(D \le D_{\max})$ | Vectorized power decay & masking |
-| `patronage_share_kernel` | $(S, H, W)$ | $P_{s, y, x} = A_{s, y, x} / \sum_k A_{k, y, x}$ | Axis-0 reduction & broadcast |
-| `captured_demand_kernel` | $(S, H, W)$ | $\text{Demand}_{s, y, x} = P_{s, y, x} \times \text{Pop}_{y, x}$ | Elementwise 2D/3D multiply | --- ## 📐 Mathematical Formulation ### 1. The Huff Spatial Gravity Model The probability that consumer population at grid cell $i = (x, y)$ chooses retail store $j \in \{1, \dots, S\}$ is: $$P_{ij} = \frac{\frac{S_j^\alpha}{d_{ij}^\beta}}{\sum_{k=1}^S \frac{S_k^\alpha}{d_{ik}^\beta}}$$ where:
-- $S_j$: Floor area (sqm) of store $j$.
-- $d_{ij}$: Euclidean distance between cell $i$ and store $j$.
-- $\alpha$: Floor area attraction exponent (default $\alpha = 1.0$).
-- $\beta$: Distance travel friction exponent (default $\beta = 1.5$). ### 2. Retail Cannibalization & Net-New Capture When evaluating candidate store site $C$:
-1. Compute baseline demand for existing store network: $$D_{\text{base}}(j) = \sum_{i} P_{ij}^{\text{base}} \cdot \text{Pop}_i$$
-2. Compute post-opening demand for existing stores: $$D_{\text{post}}(j) = \sum_{i} P_{ij}^{\text{post}} \cdot \text{Pop}_i$$
-3. Cannibalized demand: $$\text{Cannibalized} = \sum_{j \in \text{Existing}} \max\left(0,\, D_{\text{base}}(j) - D_{\text{post}}(j)\right)$$
-4. Net-New Demand: $$\text{Net New} = D_{\text{candidate}} - \text{Cannibalized}$$ --- ## 🚀 Quick Start & Usage ```bash
-# Setup environment and run tests
-uv sync
-uv run pytest # Launch FastAPI microservice & Streamlit geospatial workbench
-uv run uvicorn geofence.api.routes:app --reload --port 8000
-``` ### High-Throughput Vectorized Site Evaluation ```python
+<div align="center">
+
+<img src="docs/brand/banner.svg" alt="GeoFence — Spatial Retail Gravity & Catchment Area Optimization" width="720">
+
+</div>
+
+# GeoFence — Spatial Retail Gravity & Catchment Area Optimization
+
+**Where should the next store go?** GeoFence models how a population chooses between competing retail locations using the **Huff gravity model**, then scores candidate sites by the demand they would *actually* win — net of the demand they cannibalize from stores you already own. It runs on a synthetic city grid, exposes its analysis over a FastAPI service, and ships with an interactive Streamlit map.
+
+<div align="center">
+
+[![Python 3.12](https://img.shields.io/badge/python-3.12-blue.svg?logo=python&logoColor=white)](https://www.python.org/)
+[![FastAPI](https://img.shields.io/badge/API-FastAPI-009688.svg?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
+[![Tests: pytest](https://img.shields.io/badge/tests-pytest-0A9EDC.svg?logo=pytest&logoColor=white)](https://pytest.org/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](https://opensource.org/licenses/MIT)
+
+</div>
+
+> **Portfolio project.** Built to demonstrate spatial modelling and a clean data/API/UI split on synthetic data. Not hardened for production use.
+
+---
+
+## The problem
+
+Retail site selection is not "find the busiest corner." A busy corner may already be blanketed by your own stores, so a new outlet there mostly reshuffles existing customers rather than winning new ones. The number that matters is **net-new demand**: the customers a site captures *minus* the customers it steals from your current network (its **cannibalization**).
+
+GeoFence makes that trade-off explicit. Given a population map and a set of existing stores, it estimates the probability that each neighbourhood shops at each store, converts those probabilities into captured demand, and evaluates any candidate site — or sweeps the whole map — ranking locations by net-new demand instead of raw capture.
+
+## What it does
+
+- **Store performance** — captured demand and demand share for every existing store.
+- **Site scoring** — for a hypothetical new store, its captured demand, how much it cannibalizes from existing stores, and the net-new result.
+- **Best-site search** — sweeps candidate cells across the grid and ranks them by net-new demand.
+- **Trade areas** — a store's dominant catchment (cells where it wins a majority share) and a drive-time isochrone.
+
+## How it works
+
+The pipeline is a straight line: generate a synthetic city, serve the gravity model over HTTP, visualize it in the browser.
+
+```mermaid
+flowchart TD
+    MK["scripts/make_city.py<br/>synthetic city generator"] --> D["data/processed/<br/>population.npy + stores.parquet"]
+    D --> API["FastAPI service<br/>(geofence.api.main:app)"]
+    subgraph MODEL["Huff gravity model (models/huff.py)"]
+        H1["attraction &rarr; patronage shares"]
+        H2["captured demand per store/cell"]
+        H3["site scoring &amp; cannibalization"]
+    end
+    API --> MODEL
+    API --> EP["/stores  /score-site  /best-sites<br/>/trade-area/{id}  /heatmap  /health"]
+    EP --> UI["Streamlit map<br/>(geofence.ui.app)"]
+    EVAL["models/evaluate.py<br/>capture-greedy vs cannibalization-aware"] --> MODEL
+    EVAL --> ML["MLflow run"]
+```
+
+The synthetic city is built with a **deliberately over-served downtown**: roughly half the stores cluster in the densest centre, leaving secondary population hotspots underserved. That planted structure is what makes cannibalization matter — and what the evaluation script measures.
+
+## The gravity model
+
+The Huff model gives the probability that the population in grid cell $i = (x, y)$ shops at store $j$:
+
+$$P_{ij} = \frac{S_j^{\alpha} / d_{ij}^{\beta}}{\sum_{k} S_k^{\alpha} / d_{ik}^{\beta}}$$
+
+where $S_j$ is store floor area (sqm), $d_{ij}$ is the Euclidean cell-to-store distance (with a small intra-cell offset so a store's own cell isn't zero-distance), $\alpha$ weights store size, and $\beta$ is distance friction. Attraction is zeroed beyond a maximum service radius. Defaults (`configs/config.yaml`): $\alpha = 1.0$, $\beta = 2.0$, radius $= 12$ cells. Captured demand for a store is $\sum_i P_{ij} \cdot \text{Pop}_i$.
+
+**Cannibalization** falls straight out of the same math. To score a candidate site, GeoFence recomputes patronage shares with the candidate added to the network, then compares:
+
+$$\text{net-new} = \underbrace{\sum_i P_{i,\text{cand}} \cdot \text{Pop}_i}_{\text{candidate capture}} - \underbrace{\sum_{j \in \text{existing}} \max\!\big(0,\, D^{\text{before}}_j - D^{\text{after}}_j\big)}_{\text{cannibalized from existing}}$$
+
+### Two implementations of the same math
+
+- **`models/huff.py`** — the pandas/NumPy reference model that powers the API and Streamlit app. Readable, per-store loops over the grid.
+- **`kernels/`** — a vectorized reimplementation using a **Structure-of-Arrays** store layout (`SpatialStoreGrid`) and 3D `(stores, height, width)` NumPy broadcasts, so distance, attraction, patronage, and site evaluation each run as a single tensor operation with no Python object per cell. Exercised directly by the test suite.
+
+## Getting started
+
+```bash
+make install                       # uv sync --group dev
+
+uv run python scripts/make_city.py # generate the synthetic city (required first)
+
+make api                           # FastAPI on http://localhost:8290
+make ui                            # Streamlit map on http://localhost:8791
+```
+
+The API needs the generated city: endpoints return **503** until `scripts/make_city.py` has written `data/processed/population.npy` and `stores.parquet`. The UI reads `GEOFENCE_API_URL` (the `make ui` target points it at `http://localhost:8290`).
+
+Or with Docker:
+
+```bash
+make docker-up                     # docker compose up --build -d  (API :8290, UI :8791)
+make docker-down
+```
+
+### Score a site directly
+
+```python
 import numpy as np
-from geofence.kernels import ( SpatialStoreGrid, evaluate_site_placement_kernel,
-) # 1. Initialize 50x50 urban population density grid
-pop_grid = np.random.lognormal(mean=4.5, sigma=0.8, size=(50, 50)) # 2. Existing store fleet in Structure-of-Arrays (SoA) layout
-stores = SpatialStoreGrid( store_ids=np.array([101, 102, 103], dtype=np.int64), x_coords=np.array([12.0, 25.0, 38.0], dtype=np.float64), y_coords=np.array([15.0, 30.0, 12.0], dtype=np.float64), size_sqm=np.array([1500.0, 2400.0, 1800.0], dtype=np.float64),
-) # 3. Vectorized evaluation of candidate retail site
-result = evaluate_site_placement_kernel( candidate_x=22.0, candidate_y=18.0, candidate_size=2000.0, pop_grid=pop_grid, existing_stores=stores, alpha=1.0, beta=1.5, max_dist=20.0,
-) print(result.as_dict())
-# {
-# "best_coord": [22.0, 18.0],
-# "size_sqm": 2000.0,
-# "total_captured": 18450.2,
-# "cannibalized": 4210.5,
-# "net_new_demand": 14239.7,
-# "cannibalization_rate": "22.8%"
-# }
-``` --- ## 📊 Benchmark & Performance Metrics | Spatial Grid Dimension | Iterative OOP Object Model | GeoFence Vectorized Kernels | Speedup |
-|---|---|---|---|
-| **$25 \times 25$ Grid (625 Cells)** | 42.1ms | **0.32ms** | **131× Faster** |
-| **$50 \times 50$ Grid (2,500 Cells)** | 185.4ms | **1.15ms** | **161× Faster** |
-| **$100 \times 100$ Grid (10,000 Cells)** | 890.0ms | **4.60ms** | **193× Faster** |
-| **Candidate Optimization Search (100 Sites)** | 18.5 seconds | **[measured on your hardware]** | **168× Faster** | --- ## 🗂️ Module Organization ```
-geofence/
-├── src/geofence/
-│ ├── kernels/ ← 🏛️ Data-Oriented Vectorised Kernels Architecture
-│ │ ├── types.py │ SpatialStoreGrid (SoA layout), OptimalSiteResult
-│ │ ├── spatial.py │ distance_tensor_kernel, huff_attraction_kernel, evaluate_site_placement_kernel
-│ │ └── __init__.py
-│ ├── models/ ← 🗺️ Legacy pandas gravity procedures
-│ │ ├── huff.py │ patronage(), store_summary(), trade_area()
-│ │ └── evaluate.py │ Grid generation & metrics
-│ ├── api/ ← 🌐 FastAPI endpoints (/gravity, /optimize, /health)
-│ ├── ui/ ← 🖥️ Streamlit interactive retail GIS cockpit
-│ └── settings.py
-├── tests/
-│ ├── test_vectorized_kernels.py ← Vectorized kernel unit & property tests
-│ ├── test_geofence.py ← Spatial accuracy & API contract tests
-│ └── conftest.py
-├── docker-compose.yml
-└── pyproject.toml
-``` --- ## 👨‍💻 Author & Maintainer <div align="center"> ### **Jackson Marcus**
-**Senior AI & Machine Learning Engineer**
-*Building ML Systems, Agentic Architectures & Scalable Data Pipelines* [![GitHub Profile](https://img.shields.io/badge/GitHub-jackson--marcus-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/jackson-marcus)
-[![Upwork Portfolio](https://img.shields.io/badge/Upwork-Top%20Rated%20Plus-14A800?style=for-the-badge&logo=upwork&logoColor=white)](https://www.upwork.com/freelancers/~012235717501ad9c7b)
-[![Email Contact](https://img.shields.io/badge/Email-wajahatanees41%40gmail.com-D14836?style=for-the-badge&logo=gmail&logoColor=white)](mailto:wajahatanees41@gmail.com) 📍 *Byron, GA, USA* </div>
+from geofence.kernels import SpatialStoreGrid, evaluate_site_placement_kernel
+
+pop = np.load("data/processed/population.npy")
+stores = SpatialStoreGrid(
+    store_ids=np.array([1, 2, 3]),
+    x_coords=np.array([12.0, 25.0, 18.0]),
+    y_coords=np.array([15.0, 30.0, 12.0]),
+    size_sqm=np.array([1500.0, 2400.0, 1800.0]),
+)
+result = evaluate_site_placement_kernel(
+    candidate_x=22.0, candidate_y=18.0, candidate_size=2000.0,
+    pop_grid=pop, existing_stores=stores,
+)
+print(result.as_dict())
+```
+
+`OptimalSiteResult.as_dict()` returns `best_coord`, `size_sqm`, `total_captured`, `cannibalized`, `net_new_demand`, and `cannibalization_rate`. (Values depend entirely on your synthetic city and store layout — this is an illustrative call, not a benchmark.)
+
+## API
+
+| Method | Route | Purpose |
+|---|---|---|
+| `GET`  | `/health` | Liveness check |
+| `GET`  | `/stores` | Existing stores with captured demand and demand share |
+| `POST` | `/score-site` | Score a candidate `{x, y, size_sqm}`: capture, cannibalization, net-new |
+| `GET`  | `/best-sites?top_k=8` | Sweep candidate cells, ranked by net-new demand |
+| `GET`  | `/trade-area/{store_id}?minutes=15&threshold=0.5` | Drive-time isochrone + majority-share catchment |
+| `GET`  | `/heatmap` | Raw population grid + store coordinates (used by the UI) |
+
+## Evaluation
+
+The point isn't a headline accuracy number — it's showing that a cannibalization-aware pick beats a capture-greedy one on a city that is already over-served downtown. `models/evaluate.py` sweeps every candidate site and reports two picks side by side:
+
+- **capture-greedy** — the site with the highest raw captured demand.
+- **cannibalization-aware** — the site with the highest net-new demand.
+
+It logs both sites' net-new demand and cannibalization rates, the net-new uplift between them, and the fraction of population already covered — all to an MLflow run. To reproduce:
+
+```bash
+uv run python -m geofence.models.evaluate   # prints and logs the placement metrics
+make mlflow                                 # MLflow UI on http://localhost:5030
+```
+
+Numbers are omitted here on purpose: they depend on the generated city and seed. Run the script to produce them for your configuration.
+
+## Testing
+
+```bash
+make test                                   # uv run pytest --cov
+```
+
+- `test_geofence.py` — Huff invariants (patronage conserves covered population), cannibalization ordering by proximity, best-site ranking, isochrone growth, and the API contract.
+- `test_vectorized_kernels.py` — tensor shapes and probability invariants for the vectorized kernels, plus the capture/cannibalization/net-new decomposition.
+
+## Limitations
+
+- **Distance is straight-line, not road network.** The "drive-time" isochrone is Euclidean distance at a flat assumed speed, not real routing.
+- **Synthetic data only.** The city, population, and stores are generated; $\alpha$, $\beta$, and the service radius would need calibration against real footfall or transaction data.
+- **The API uses the pandas reference model.** The vectorized kernels implement the same math but are not wired into the service; the two share defaults but are configured independently.
+- **Grid-scale.** Everything runs on a small in-memory grid (default 40&times;40); it is a modelling demo, not a large-scale GIS engine.
+
+## Project structure
+
+```
+src/geofence/
+├── models/     # Huff gravity model (huff.py) + placement benchmark (evaluate.py) — powers the API
+├── kernels/    # Vectorized Structure-of-Arrays reimplementation (spatial.py, types.py)
+├── api/        # FastAPI app (main:app) and routes
+├── ui/         # Streamlit map + site scorer
+└── settings.py # env + configs/config.yaml loader
+scripts/make_city.py   # synthetic city generator (run before the API)
+configs/config.yaml     # grid size, gravity params, placement sweep
+```
+
+## License
+
+MIT
+
+---
+
+<div align="center">
+
+**Jackson Marcus** · Senior AI & Machine Learning Engineer
+
+[![GitHub](https://img.shields.io/badge/GitHub-jackson--marcus-181717?logo=github&logoColor=white)](https://github.com/jackson-marcus)
+[![Email](https://img.shields.io/badge/Email-contact-D14836?logo=gmail&logoColor=white)](mailto:wajahatanees41@gmail.com)
+
+</div>
