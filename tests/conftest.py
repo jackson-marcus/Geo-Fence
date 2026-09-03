@@ -26,8 +26,16 @@ def tiny_city():
 
 
 @pytest.fixture
+def live_network(tiny_city):
+    from geofence.streams.consumer import LiveNetwork
+
+    population, stores = tiny_city
+    return LiveNetwork(population, stores, get_config()["gravity"])
+
+
+@pytest.fixture
 def api_client(tmp_path, tiny_city):
-    """TestClient wired to tmp artifacts; restores config + caches afterwards."""
+    """TestClient wired to tmp artifacts; restores config + the network cache afterwards."""
     from fastapi.testclient import TestClient
 
     from geofence.api import routes
@@ -40,9 +48,9 @@ def api_client(tmp_path, tiny_city):
     cfg = get_config()
     original = cfg["data"]["processed_dir"]
     cfg["data"]["processed_dir"] = str(tmp_path)
-    routes._city.cache_clear()
+    routes._network.cache_clear()
     try:
         yield TestClient(app)
     finally:
         cfg["data"]["processed_dir"] = original
-        routes._city.cache_clear()
+        routes._network.cache_clear()
